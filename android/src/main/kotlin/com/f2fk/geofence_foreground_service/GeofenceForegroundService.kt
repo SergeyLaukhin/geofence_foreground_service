@@ -3,6 +3,7 @@ package com.f2fk.geofence_foreground_service
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.Looper
@@ -113,7 +114,11 @@ class GeofenceForegroundService : Service() {
                 stopForeground(STOP_FOREGROUND_DETACH)
             }
 
-            startForeground(serviceId, notification.build())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(serviceId, notification.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+            } else {
+                startForeground(serviceId, notification.build())
+            }
         } else if (geofenceAction == GeofenceServiceAction.TRIGGER) {
             handleGeofenceEvent(intent)
         }
