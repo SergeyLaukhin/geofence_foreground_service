@@ -68,28 +68,21 @@ class GeofenceForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
-        val geofenceAction: GeofenceServiceAction = GeofenceServiceAction.valueOf(
-            intent.getStringExtra(
-                applicationContext!!.extraNameGen(Constants.geofenceAction)
-            )!!
-        )
+        val context = applicationContext ?: return START_NOT_STICKY
 
-        val appIcon: Int = intent.getIntExtra(
-            applicationContext!!.extraNameGen(Constants.appIcon),
-            0
-        )
+        val geofenceActionStr = intent.getStringExtra(context.extraNameGen(Constants.geofenceAction))
+        val geofenceAction: GeofenceServiceAction = geofenceActionStr?.let {
+            GeofenceServiceAction.valueOf(it)
+        } ?: GeofenceServiceAction.SETUP
 
-        val notificationChannelId: String = intent.getStringExtra(
-            applicationContext!!.extraNameGen(Constants.channelId)
-        )!!
+        val appIcon: Int = intent.getIntExtra(context.extraNameGen(Constants.appIcon), 0)
 
-        val notificationContentTitle: String = intent.getStringExtra(
-            applicationContext!!.extraNameGen(Constants.contentTitle)
-        )!!
+        val notificationChannelId: String = intent.getStringExtra(context.extraNameGen(Constants.channelId)) ?: "com.practicehub.geofencing_notifications_channel"
 
-        val notificationContentText: String = intent.getStringExtra(
-            applicationContext!!.extraNameGen(Constants.contentText)
-        )!!
+        val notificationContentTitle: String = intent.getStringExtra(context.extraNameGen(Constants.contentTitle)) ?: "Patient Check-In Service"
+
+        val notificationContentText: String = intent.getStringExtra(context.extraNameGen(Constants.contentText)) ?: "Monitoring your location for automatic check-ins"
+
 
         val notification: NotificationCompat.Builder = NotificationCompat
             .Builder(
@@ -107,7 +100,7 @@ class GeofenceForegroundService : Service() {
 
             val serviceId: Int = intent.getIntExtra(
                 Constants.serviceId,
-                525600
+                543456
             )
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
