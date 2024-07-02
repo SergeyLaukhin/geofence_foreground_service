@@ -75,124 +75,129 @@ class GeofenceForegroundServicePlugin : FlutterPlugin, MethodCallHandler, Activi
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
-        when (call.method) {
-            "startGeofencingService" -> {
-                try {
-                    SharedPreferenceHelper.saveCallbackDispatcherHandleKey(
-                        context,
-                        call.argument<Long>(Constants.callbackHandle)!!
-                    )
-
-                    serviceIntent = Intent(context, GeofenceForegroundService::class.java)
-
-                    channelId = call.argument<String>(Constants.channelId)
-                    contentTitle = call.argument<String>(Constants.contentTitle)
-                    contentText = call.argument<String>(Constants.contentText)
-                    serviceId = call.argument<Int>(Constants.serviceId)
-                    isInDebugMode = call.argument<Boolean>(Constants.isInDebugMode) ?: false
-
-                    val iconDataJson: Map<String, Any>? = call.argument<Map<String, Any>>(
-                        Constants.iconData
-                    )
-
-                    if (iconDataJson != null) {
-                        iconData = NotificationIconData.fromJson(
-                            iconDataJson
-                        )
-                    }
-
-                    serviceIntent.putExtra(
-                        activity!!.extraNameGen(Constants.isInDebugMode),
-                        isInDebugMode
-                    )
-
-                    serviceIntent.putExtra(
-                        activity!!.extraNameGen(Constants.geofenceAction),
-                        GeofenceServiceAction.SETUP.toString()
-                    )
-
-                    serviceIntent.putExtra(
-                        activity!!.extraNameGen(Constants.appIcon),
-                        getIconResId(iconData)
-                    )
-
-                    serviceIntent.putExtra(
-                        activity!!.extraNameGen(Constants.channelId),
-                        channelId
-                    )
-
-                    serviceIntent.putExtra(
-                        activity!!.extraNameGen(Constants.contentTitle),
-                        contentTitle
-                    )
-
-                    serviceIntent.putExtra(
-                        activity!!.extraNameGen(Constants.contentText),
-                        contentText
-                    )
-
-                    serviceIntent.putExtra(
-                        activity!!.extraNameGen(Constants.serviceId),
-                        serviceId
-                    )
-
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        val channelName = "Geofence foreground service"
-                        val channel = NotificationChannel(
-                            channelId,
-                            channelName,
-                            NotificationManager.IMPORTANCE_HIGH
+        try {
+            when (call.method) {
+                "startGeofencingService" -> {
+                    try {
+                        SharedPreferenceHelper.saveCallbackDispatcherHandleKey(
+                            context,
+                            call.argument<Long>(Constants.callbackHandle)!!
                         )
 
-                        channel.description = "A channel for receiving geofencing notifications"
+                        serviceIntent = Intent(context, GeofenceForegroundService::class.java)
 
-                        val notificationManager =
-                            activity?.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                        channelId = call.argument<String>(Constants.channelId)
+                        contentTitle = call.argument<String>(Constants.contentTitle)
+                        contentText = call.argument<String>(Constants.contentText)
+                        serviceId = call.argument<Int>(Constants.serviceId)
+                        isInDebugMode = call.argument<Boolean>(Constants.isInDebugMode) ?: false
 
-                        notificationManager.createNotificationChannel(channel)
+                        val iconDataJson: Map<String, Any>? = call.argument<Map<String, Any>>(
+                            Constants.iconData
+                        )
+
+                        if (iconDataJson != null) {
+                            iconData = NotificationIconData.fromJson(
+                                iconDataJson
+                            )
+                        }
+
+                        serviceIntent.putExtra(
+                            activity?.extraNameGen(Constants.isInDebugMode),
+                            isInDebugMode
+                        )
+
+                        serviceIntent.putExtra(
+                            activity?.extraNameGen(Constants.geofenceAction),
+                            GeofenceServiceAction.SETUP.toString()
+                        )
+
+                        serviceIntent.putExtra(
+                            activity?.extraNameGen(Constants.appIcon),
+                            getIconResId(iconData)
+                        )
+
+                        serviceIntent.putExtra(
+                            activity?.extraNameGen(Constants.channelId),
+                            channelId
+                        )
+
+                        serviceIntent.putExtra(
+                            activity?.extraNameGen(Constants.contentTitle),
+                            contentTitle
+                        )
+
+                        serviceIntent.putExtra(
+                            activity?.extraNameGen(Constants.contentText),
+                            contentText
+                        )
+
+                        serviceIntent.putExtra(
+                            activity?.extraNameGen(Constants.serviceId),
+                            serviceId
+                        )
+
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            val channelName = "Geofence foreground service"
+                            val channel = NotificationChannel(
+                                channelId,
+                                channelName,
+                                NotificationManager.IMPORTANCE_HIGH
+                            )
+
+                            channel.description = "A channel for receiving geofencing notifications"
+
+                            val notificationManager =
+                                activity?.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+                            notificationManager.createNotificationChannel(channel)
+                        }
+
+                        ContextCompat.startForegroundService(context, serviceIntent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
                     }
+                }
 
-                    ContextCompat.startForegroundService(context, serviceIntent)
-                    result.success(true)
-                } catch (e: Exception) {
-                    result.success(false)
+                "stopGeofencingService" -> {
+                    try {
+                        context.stopService(serviceIntent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+
+                "isForegroundServiceRunning" -> {
+                    result.success(context.isServiceRunning(GeofenceForegroundService::class.java))
+                }
+
+                "addGeofence" -> {
+                    val zone: Zone = Zone.fromJson(call.arguments as Map<String, Any>)
+
+                    addGeofence(zone, result)
+                }
+
+                "addGeoFences" -> {
+                    val zonesList: ZonesList =
+                        ZonesList.fromJson(call.arguments as Map<String, Any>)
+
+                    addGeoFences(zonesList, result)
+                }
+
+                "removeGeofence" -> {
+                    val zonesId: String = call.argument(Constants.zoneId)!!
+
+                    removeGeofence(listOf(zonesId), result)
+                }
+
+                else -> {
+                    result.notImplemented()
                 }
             }
-
-            "stopGeofencingService" -> {
-                try {
-                    context.stopService(serviceIntent)
-                    result.success(true)
-                } catch (e: Exception) {
-                    result.success(false)
-                }
-            }
-
-            "isForegroundServiceRunning" -> {
-                result.success(context.isServiceRunning(GeofenceForegroundService::class.java))
-            }
-
-            "addGeofence" -> {
-                val zone: Zone = Zone.fromJson(call.arguments as Map<String, Any>)
-
-                addGeofence(zone, result)
-            }
-
-            "addGeoFences" -> {
-                val zonesList: ZonesList = ZonesList.fromJson(call.arguments as Map<String, Any>)
-
-                addGeoFences(zonesList, result)
-            }
-
-            "removeGeofence" -> {
-                val zonesId: String = call.argument(Constants.zoneId)!!
-
-                removeGeofence(listOf(zonesId), result)
-            }
-
-            else -> {
-                result.notImplemented()
-            }
+        } catch (e: Exception) {
+            // ignore
         }
     }
 
@@ -232,37 +237,37 @@ class GeofenceForegroundServicePlugin : FlutterPlugin, MethodCallHandler, Activi
         val geofenceIntent = Intent(context, GeofenceForegroundService::class.java)
 
         geofenceIntent.putExtra(
-            activity!!.extraNameGen(Constants.isInDebugMode),
+            activity?.extraNameGen(Constants.isInDebugMode),
             isInDebugMode
         )
 
         geofenceIntent.putExtra(
-            activity!!.extraNameGen(Constants.geofenceAction),
+            activity?.extraNameGen(Constants.geofenceAction),
             GeofenceServiceAction.TRIGGER.toString()
         )
 
         geofenceIntent.putExtra(
-            activity!!.extraNameGen(Constants.appIcon),
+            activity?.extraNameGen(Constants.appIcon),
             getIconResId(iconData)
         )
 
         geofenceIntent.putExtra(
-            activity!!.extraNameGen(Constants.channelId),
+            activity?.extraNameGen(Constants.channelId),
             channelId
         )
 
         geofenceIntent.putExtra(
-            activity!!.extraNameGen(Constants.contentTitle),
+            activity?.extraNameGen(Constants.contentTitle),
             contentTitle
         )
 
         geofenceIntent.putExtra(
-            activity!!.extraNameGen(Constants.contentText),
+            activity?.extraNameGen(Constants.contentText),
             contentText
         )
 
         geofenceIntent.putExtra(
-            activity!!.extraNameGen(Constants.serviceId),
+            activity?.extraNameGen(Constants.serviceId),
             serviceId
         )
 
@@ -359,20 +364,24 @@ class GeofenceForegroundServicePlugin : FlutterPlugin, MethodCallHandler, Activi
     }
 
     private fun getIconResIdFromIconData(iconData: NotificationIconData): Int {
-        val resType = iconData.resType
-        val resPrefix = iconData.resPrefix
-        val name = iconData.name
-        if (resType.isEmpty() || resPrefix.isEmpty() || name.isEmpty()) {
-            return 0
-        }
+        try {
+            val resType = iconData.resType
+            val resPrefix = iconData.resPrefix
+            val name = iconData.name
+            if (resType.isEmpty() || resPrefix.isEmpty() || name.isEmpty()) {
+                return 0
+            }
 
-        val resName = if (resPrefix.contains("ic")) {
-            String.format("ic_%s", name)
-        } else {
-            String.format("img_%s", name)
-        }
+            val resName = if (resPrefix.contains("ic")) {
+                String.format("ic_%s", name)
+            } else {
+                String.format("img_%s", name)
+            }
 
-        return activity!!.resources.getIdentifier(resName, resType, activity!!.packageName)
+            return activity!!.resources.getIdentifier(resName, resType, activity!!.packageName)
+        } catch (e: Exception) {
+            //ignore
+        }
     }
 
     private fun getIconResIdFromAppInfo(): Int {
@@ -384,7 +393,7 @@ class GeofenceForegroundServicePlugin : FlutterPlugin, MethodCallHandler, Activi
                 )
 
             appInfo.icon
-        } catch (e: PackageManager.NameNotFoundException) {
+        } catch (e: Exception) {
             Log.e("getIconResIdFromAppInfo", "getIconResIdFromAppInfo", e)
             0
         }

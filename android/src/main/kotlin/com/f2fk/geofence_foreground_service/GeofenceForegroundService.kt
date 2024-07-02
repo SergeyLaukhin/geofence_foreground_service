@@ -38,28 +38,34 @@ class GeofenceForegroundService : Service() {
     override fun onCreate() {
         super.onCreate()
 
-        fusedLocationProviderClient =
-            LocationServices.getFusedLocationProviderClient(this)
+        try {
 
-        locationRequest = LocationRequest.Builder(
-            Priority.PRIORITY_HIGH_ACCURACY,
-            TimeUnit.SECONDS.toMillis(20)
-        ).apply {
-            setMinUpdateDistanceMeters(100f)
-            setGranularity(Granularity.GRANULARITY_PERMISSION_LEVEL)
-            setWaitForAccurateLocation(true)
-        }
-            .build()
+            fusedLocationProviderClient =
+                LocationServices.getFusedLocationProviderClient(this)
 
-        locationCallback = object : LocationCallback() {
-            override fun onLocationResult(locationResult: LocationResult) {
-                super.onLocationResult(locationResult)
-
-                Log.d(
-                    "onLocationResult",
-                    "${locationResult.lastLocation?.latitude}, ${locationResult.lastLocation?.longitude}"
-                )
+            locationRequest = LocationRequest.Builder(
+                Priority.PRIORITY_HIGH_ACCURACY,
+                TimeUnit.SECONDS.toMillis(20)
+            ).apply {
+                setMinUpdateDistanceMeters(100f)
+                setGranularity(Granularity.GRANULARITY_PERMISSION_LEVEL)
+                setWaitForAccurateLocation(true)
             }
+                .build()
+
+            locationCallback = object : LocationCallback() {
+                override fun onLocationResult(locationResult: LocationResult) {
+                    super.onLocationResult(locationResult)
+
+                    Log.d(
+                        "onLocationResult",
+                        "${locationResult.lastLocation?.latitude}, ${locationResult.lastLocation?.longitude}"
+                    )
+                }
+            }
+        }  catch (e: Exception) {
+            println(e.message)
+            println(e.toString())
         }
     }
 
@@ -68,52 +74,68 @@ class GeofenceForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
-        val context = applicationContext ?: return START_NOT_STICKY
+        try {
+            val context = applicationContext ?: return START_NOT_STICKY
 
-        val geofenceActionStr = intent.getStringExtra(context.extraNameGen(Constants.geofenceAction))
-        val geofenceAction: GeofenceServiceAction = geofenceActionStr?.let {
-            GeofenceServiceAction.valueOf(it)
-        } ?: GeofenceServiceAction.SETUP
+            val geofenceActionStr =
+                intent.getStringExtra(context.extraNameGen(Constants.geofenceAction))
+            val geofenceAction: GeofenceServiceAction = geofenceActionStr?.let {
+                GeofenceServiceAction.valueOf(it)
+            } ?: GeofenceServiceAction.SETUP
 
-        val appIcon: Int = intent.getIntExtra(context.extraNameGen(Constants.appIcon), 0)
+            val appIcon: Int = intent.getIntExtra(context.extraNameGen(Constants.appIcon), 0)
 
-        val notificationChannelId: String = intent.getStringExtra(context.extraNameGen(Constants.channelId)) ?: "com.practicehub.geofencing_notifications_channel"
+            val notificationChannelId: String =
+                intent.getStringExtra(context.extraNameGen(Constants.channelId))
+                    ?: "com.practicehub.geofencing_notifications_channel"
 
-        val notificationContentTitle: String = intent.getStringExtra(context.extraNameGen(Constants.contentTitle)) ?: "Patient Check-In Service"
+            val notificationContentTitle: String =
+                intent.getStringExtra(context.extraNameGen(Constants.contentTitle))
+                    ?: "Patient Check-In Service"
 
-        val notificationContentText: String = intent.getStringExtra(context.extraNameGen(Constants.contentText)) ?: "Monitoring your location for automatic check-ins"
+            val notificationContentText: String =
+                intent.getStringExtra(context.extraNameGen(Constants.contentText))
+                    ?: "Monitoring your location for automatic check-ins"
 
 
-        val notification: NotificationCompat.Builder = NotificationCompat
-            .Builder(
-                this.baseContext,
-                notificationChannelId,
-            )
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setSmallIcon(appIcon)
-            .setContentTitle(notificationContentTitle)
-            .setContentText(notificationContentText)
+            val notification: NotificationCompat.Builder = NotificationCompat
+                .Builder(
+                    this.baseContext,
+                    notificationChannelId,
+                )
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setSmallIcon(appIcon)
+                .setContentTitle(notificationContentTitle)
+                .setContentText(notificationContentText)
 
-        if (geofenceAction == GeofenceServiceAction.SETUP) {
-            subscribeToLocationUpdates()
+            if (geofenceAction == GeofenceServiceAction.SETUP) {
+                subscribeToLocationUpdates()
 
-            val serviceId: Int = intent.getIntExtra(
-                Constants.serviceId,
-                543456
-            )
+                val serviceId: Int = intent.getIntExtra(
+                    Constants.serviceId,
+                    543456
+                )
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                stopForeground(STOP_FOREGROUND_DETACH)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_DETACH)
+                }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(
+                        serviceId,
+                        notification.build(),
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                    )
+                } else {
+                    startForeground(serviceId, notification.build())
+                }
+            } else if (geofenceAction == GeofenceServiceAction.TRIGGER) {
+                handleGeofenceEvent(intent)
             }
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(serviceId, notification.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
-            } else {
-                startForeground(serviceId, notification.build())
-            }
-        } else if (geofenceAction == GeofenceServiceAction.TRIGGER) {
-            handleGeofenceEvent(intent)
+        }  catch (e: Exception) {
+            println(e.message)
+            println(e.toString())
         }
 
         return START_STICKY
@@ -122,7 +144,7 @@ class GeofenceForegroundService : Service() {
     private fun handleGeofenceEvent(intent: Intent) {
         try {
             val isInDebugMode: Boolean = intent.getBooleanExtra(
-                applicationContext!!.extraNameGen(Constants.isInDebugMode),
+                applicationContext?.extraNameGen(Constants.isInDebugMode),
                 false
             )
 
@@ -144,7 +166,7 @@ class GeofenceForegroundService : Service() {
                             ))
                             .build()
 
-                    this.baseContext!!.workManager().enqueueUniqueWork(
+                    this.baseContext?.workManager()?.enqueueUniqueWork(
                         Constants.bgTaskUniqueName,
                         ExistingWorkPolicy.APPEND_OR_REPLACE,
                         oneOffTaskRequest

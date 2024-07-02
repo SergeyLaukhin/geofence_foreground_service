@@ -49,7 +49,7 @@ class BackgroundWorker(
         get() = workerParams.inputData.getString(PAYLOAD_KEY)
 
     private val zoneId
-        get() = workerParams.inputData.getString(ZONE_ID)!!
+        get() = workerParams.inputData.getString(ZONE_ID)
 
     private val isInDebug
         get() = workerParams.inputData.getBoolean(IS_IN_DEBUG_MODE_KEY, false)
@@ -67,54 +67,60 @@ class BackgroundWorker(
     }
 
     override fun startWork(): ListenableFuture<Result> {
-        startTime = System.currentTimeMillis()
+        try {
+            startTime = System.currentTimeMillis()
 
-        engine = FlutterEngine(applicationContext)
+            engine = FlutterEngine(applicationContext)
 
-        if (!flutterLoader.initialized()) {
-            flutterLoader.startInitialization(applicationContext)
-        }
-
-        flutterLoader.ensureInitializationCompleteAsync(
-            applicationContext,
-            null,
-            Handler(Looper.getMainLooper())
-        ) {
-            val callbackHandle = SharedPreferenceHelper.getCallbackHandle(applicationContext)
-            val callbackInfo = FlutterCallbackInformation.lookupCallbackInformation(callbackHandle)
-            val dartBundlePath = flutterLoader.findAppBundlePath()
-
-            if (isInDebug) {
-                DebugHelper.postTaskStarting(
-                    applicationContext,
-                    randomThreadIdentifier,
-                    zoneId,
-                    payload,
-                    callbackHandle,
-                    callbackInfo,
-                    dartBundlePath
-                )
+            if (!flutterLoader.initialized()) {
+                flutterLoader.startInitialization(applicationContext)
             }
 
-            // Backwards compatibility with v1. We register all the user's plugins.
-            GeofenceForegroundServicePlugin.pluginRegistryCallback?.registerWith(
-                ShimPluginRegistry(
-                    engine!!
-                )
-            )
+            flutterLoader.ensureInitializationCompleteAsync(
+                applicationContext,
+                null,
+                Handler(Looper.getMainLooper())
+            ) {
+                val callbackHandle = SharedPreferenceHelper.getCallbackHandle(applicationContext)
+                val callbackInfo =
+                    FlutterCallbackInformation.lookupCallbackInformation(callbackHandle)
+                val dartBundlePath = flutterLoader.findAppBundlePath()
 
-            engine?.let { engine ->
-                backgroundChannel = MethodChannel(engine.dartExecutor, BACKGROUND_CHANNEL_NAME)
-                backgroundChannel.setMethodCallHandler(this@BackgroundWorker)
+                if (isInDebug) {
+                    DebugHelper.postTaskStarting(
+                        applicationContext,
+                        randomThreadIdentifier,
+                        zoneId ?: "Unknown",
+                        payload,
+                        callbackHandle,
+                        callbackInfo,
+                        dartBundlePath
+                    )
+                }
 
-                engine.dartExecutor.executeDartCallback(
-                    DartExecutor.DartCallback(
-                        applicationContext.assets,
-                        dartBundlePath,
-                        callbackInfo
+                // Backwards compatibility with v1. We register all the user's plugins.
+                GeofenceForegroundServicePlugin.pluginRegistryCallback?.registerWith(
+                    ShimPluginRegistry(
+                        engine!!
                     )
                 )
+
+                engine?.let { engine ->
+                    backgroundChannel = MethodChannel(engine.dartExecutor, BACKGROUND_CHANNEL_NAME)
+                    backgroundChannel.setMethodCallHandler(this@BackgroundWorker)
+
+                    engine.dartExecutor.executeDartCallback(
+                        DartExecutor.DartCallback(
+                            applicationContext.assets,
+                            dartBundlePath,
+                            callbackInfo
+                        )
+                    )
+                }
             }
+        }  catch (e: Exception) {
+            println(e.message)
+            println(e.toString())
         }
 
         return resolvableFuture
@@ -131,7 +137,7 @@ class BackgroundWorker(
             DebugHelper.postTaskCompleteNotification(
                 applicationContext,
                 randomThreadIdentifier,
-                zoneId,
+                zoneId ?: "Unknown",
                 payload,
                 fetchDuration,
                 result ?: Result.failure()
